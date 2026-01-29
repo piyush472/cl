@@ -762,20 +762,57 @@
             },
 
             toggleRecording: () => {
-                const btn = document.getElementById('btn-record');
-                const inner = btn.querySelector('div');
-                state.recording = !state.recording;
-                
-                if(state.recording) {
-                    inner.className = "w-6 h-6 bg-white rounded-sm animate-pulse";
-                    btn.classList.add("scale-110", "ring-4", "ring-red-900");
-                    state.recordStartTime = new Date();
-                } else {
-                    inner.className = "w-6 h-6 bg-white rounded-sm";
-                    btn.classList.remove("scale-110", "ring-4", "ring-red-900");
-                    app.submitToDatabase();
-                }
-            },
+    const btn = document.getElementById('btn-record');
+    const inner = btn.querySelector('div');
+    const video = document.getElementById('webcam');
+
+    state.recording = !state.recording;
+
+    if (state.recording) {
+        inner.className = "w-6 h-6 bg-white rounded-sm animate-pulse";
+        btn.classList.add("scale-110", "ring-4", "ring-red-900");
+
+        // Initialize recording
+        state.recordedChunks = [];
+        if (!video.srcObject) return alert("Camera not started!");
+        
+        state.mediaRecorder = new MediaRecorder(video.srcObject, { mimeType: "video/webm" });
+
+        state.mediaRecorder.ondataavailable = (e) => {
+            if (e.data.size > 0) state.recordedChunks.push(e.data);
+        };
+
+        state.mediaRecorder.onstop = () => {
+            const blob = new Blob(state.recordedChunks, { type: "video/webm" });
+            const url = URL.createObjectURL(blob);
+
+            // Auto-download the video
+            const a = document.createElement('a');
+            a.style.display = 'none';
+            a.href = url;
+            a.download = `${state.dance?.name || 'dance'}-${Date.now()}.webm`;
+            document.body.appendChild(a);
+            a.click();
+            document.body.removeChild(a);
+            URL.revokeObjectURL(url);
+        };
+
+        state.mediaRecorder.start();
+        state.recordStartTime = new Date();
+
+    } else {
+        inner.className = "w-6 h-6 bg-white rounded-sm";
+        btn.classList.remove("scale-110", "ring-4", "ring-red-900");
+
+        if (state.mediaRecorder && state.mediaRecorder.state !== "inactive") {
+            state.mediaRecorder.stop();
+        }
+
+        // Submit data to database as before
+        app.submitToDatabase();
+    }
+}
+,
 
             submitToDatabase: async () => {
                 const modal = document.getElementById('processing-modal');
